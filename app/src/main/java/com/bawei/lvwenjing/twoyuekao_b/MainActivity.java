@@ -5,8 +5,10 @@ import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.support.v4.content.FileProvider;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
@@ -15,9 +17,6 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.ListView;
 
-import com.google.android.gms.appindexing.Action;
-import com.google.android.gms.appindexing.AppIndex;
-import com.google.android.gms.appindexing.Thing;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.gson.Gson;
 import com.liaoinstan.springview.container.DefaultFooter;
@@ -29,11 +28,6 @@ import org.xutils.http.RequestParams;
 import org.xutils.x;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -60,6 +54,7 @@ public class MainActivity extends Activity {
         lv = (ListView) findViewById(R.id.lv);
         adapters = new Adapters(geturl, MainActivity.this);
         lv.setAdapter(adapters);
+        adapters.notifyDataSetChanged();
         springView.setHeader(new DefaultHeader(this));
         springView.setFooter(new DefaultFooter(this));
         springView.setType(SpringView.Type.FOLLOW);
@@ -118,14 +113,15 @@ public class MainActivity extends Activity {
                 builder.show();
             }
         });
-        springView.setListener(new SpringView.OnFreshListener() {
+     springView.setListener(new SpringView.OnFreshListener() {
             @Override
             public void onRefresh() {
                 list.clear();
                 adapters.notifyDataSetChanged();
                 List<Bean.AppBean> geturls = geturl();
-                Adapters adapters = new Adapters(geturls, MainActivity.this);
-                lv.setAdapter(adapters);
+                Adapters adaptersa = new Adapters(geturls, MainActivity.this);
+                lv.setAdapter(adaptersa);
+                adaptersa.notifyDataSetChanged();
                 springView.onFinishFreshAndLoad();
             }
 
@@ -141,7 +137,6 @@ public class MainActivity extends Activity {
     }
 
 
-
     private void getdata() {
         String url = "http://imtt.dd.qq.com/16891/E4E087B63E27B87175F4B9BC7CFC4997.apk?fsname=com.tencent.qlauncher_6.0.2_64170111.apk&csr=97c2";
         RequestParams params = new RequestParams(url);
@@ -154,13 +149,26 @@ public class MainActivity extends Activity {
             @Override
             public void onSuccess(File result) {
                 //apk下载完成后，调用系统的安装方法
-                Intent intent = new Intent(Intent.ACTION_VIEW);
+             /*   Intent intent = new Intent(Intent.ACTION_VIEW);
                 intent.setDataAndType(Uri.fromFile(result), "application/vnd.android.package-archive");
+                startActivity(intent);*/
+
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+//判断是否是AndroidN以及更高的版本
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    Uri contentUri = FileProvider.getUriForFile(MainActivity.this, BuildConfig.APPLICATION_ID + ".fileProvider", result);
+                    intent.setDataAndType(contentUri, "application/vnd.android.package-archive");
+                } else {
+                    intent.setDataAndType(Uri.fromFile(result), "application/vnd.android.package-archive");
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                }
                 startActivity(intent);
             }
 
             @Override
             public void onError(Throwable ex, boolean isOnCallback) {
+                System.out.println("sssssssssssssssss");
             }
 
             @Override
@@ -170,14 +178,17 @@ public class MainActivity extends Activity {
             @Override
             public void onFinished() {
             }
+
             //网络请求之前回调
             @Override
             public void onWaiting() {
             }
+
             //网络请求开始的时候回调
             @Override
             public void onStarted() {
             }
+
             //下载的时候不断回调的方法
             @Override
             public void onLoading(long total, long current, boolean isDownloading) {
@@ -187,9 +198,6 @@ public class MainActivity extends Activity {
         });
 
     }
-
-
-
 
 
     public List<Bean.AppBean> geturl() {
